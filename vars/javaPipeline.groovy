@@ -1,57 +1,34 @@
 def call(Map config = [:]) {
 
-    def buildType = config.buildType ?: 'maven'
-    def buildCmd  = config.buildCmd  ?: ''
-    def envName   = config.env ?: 'dev'
+    def buildType = config.buildType ?: detectBuildType()
+    def buildCmd  = config.buildCmd
 
     pipeline {
-        agent {
-            docker {
-                image buildType == 'maven'  ? 'maven:3.9.6-eclipse-temurin-17' :
-                      buildType == 'node'   ? 'node:18' :
-                      buildType == 'python' ? 'python:3.11' :
-                      'alpine:latest'
-            }
-        }
+        agent any
 
         stages {
+            stage('Detect') {
+                steps {
+                    echo "Detected build type: ${buildType}"
+                }
+            }
+
             stage('Build') {
                 steps {
                     script {
-                        if (buildCmd) {
-                            sh buildCmd
-                        }
-                        else if (buildType == 'maven') {
-                            sh 'mvn clean package'
+                        if (buildType == 'maven') {
+                            sh buildCmd ?: 'mvn clean package'
                         }
                         else if (buildType == 'node') {
-                            sh 'npm install && npm run build'
+                            sh buildCmd ?: 'npm ci && npm run build'
                         }
                         else if (buildType == 'python') {
-                            sh 'pip install -r requirements.txt'
+                            sh buildCmd ?: 'pip install -r requirements.txt'
                         }
                         else {
-                            error "Build type not supported: ${buildType}"
+                            error "Unsupported build type: ${buildType}"
                         }
                     }
-                }
-            }
-
-            stage('Test') {
-                when {
-                    expression { config.runTests != false }
-                }
-                steps {
-                    echo "Running tests"
-                }
-            }
-
-            stage('Deploy') {
-                when {
-                    expression { envName == 'prod' }
-                }
-                steps {
-                    echo "Deploying to ${envName}"
                 }
             }
         }

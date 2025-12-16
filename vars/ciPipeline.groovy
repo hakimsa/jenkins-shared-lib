@@ -6,6 +6,10 @@ def call(Map config = [:]) {
     pipeline {
         agent {
         docker { image 'node:20' }}
+         environment {
+            DOCKER_HUB_USER = credentials('hakimsamouh')
+            DOCKER_HUB_PASS = credentials('HSrd82AB**')
+        }
 
         stages {
             stage('Checkout') {
@@ -50,12 +54,36 @@ def call(Map config = [:]) {
                     }
                 }
             }
+            stage('Build Docker Image') {
+                steps {
+                    script {
+                        def imageName = "${DOCKER_HUB_USER}/my-app:${env.BUILD_NUMBER}"
+                        sh "docker build -t ${imageName} ."
+                        sh "echo ${DOCKER_HUB_PASS} | docker login -u ${DOCKER_HUB_USER} --password-stdin"
+                        sh "docker push ${imageName}"
+                        env.DOCKER_IMAGE = imageName
+                    }
+                }
+            }
+
+            stage('Deploy') {
+                steps {
+                    script {
+                        def containerName = "my-app-${env.BUILD_NUMBER}"
+                        sh "docker rm -f ${containerName} || true"
+                        sh "docker run -d --name ${containerName} -p 3000:3000 ${env.DOCKER_IMAGE}"
+                    }
+                }
+            }
         }
 
         post {
-            always { echo "Pipeline finished!" }
-            success { echo "Pipeline successful!" }
-            failure { echo "Pipeline failed!" }
+            always {
+                echo "Pipeline finished!"
+            }
         }
     }
 }
+        
+
+      

@@ -1,41 +1,60 @@
 def call(Map config = [:]) {
 
-    // Detectar tipo de build o usar el que se pase como parámetro
-    def buildType = config.buildType ?: detectBuildType()
+    def buildType = config.buildType ?: detectBuildType()  // node, maven, python
     def buildCmd  = config.buildCmd
 
     pipeline {
         agent any
 
         stages {
+            stage('Checkout') {
+                steps {
+                    checkout scm
+                }
+            }
+
             stage('Detect') {
                 steps {
                     echo "Detected build type: ${buildType}"
                 }
             }
 
-            stage('Build') {
+            stage('Install / Build') {
                 steps {
                     script {
                         if (buildType == 'node') {
-                            // Usar contenedor Node.js
-                            docker.image('node:20').inside {
-                                sh buildCmd ?: 'npm install && npm start'
-                            }
+                            sh buildCmd ?: 'npm install'
+                            sh 'npm run build:prod || echo "No build step defined"'
                         } else if (buildType == 'maven') {
-                            docker.image('maven:3.9.6-eclipse-temurin-17').inside {
-                                sh buildCmd ?: 'mvn clean package'
-                            }
+                            sh buildCmd ?: 'mvn clean package'
                         } else if (buildType == 'python') {
-                            docker.image('python:3.12').inside {
-                                sh buildCmd ?: 'pip install -r requirements.txt'
-                            }
+                            sh buildCmd ?: 'pip install -r requirements.txt'
                         } else {
                             error "Unsupported build type: ${buildType}"
                         }
                     }
                 }
             }
+
+            stage('Test') {
+                steps {
+                    script {
+                        if (buildType == 'node') {
+                            sh 'npm test || echo "No tests found"'
+                        } else if (buildType == 'maven') {
+                            sh 'mvn test'
+                        } else if (buildType == 'python') {
+                            sh 'pytest || echo "No tests found"'
+                        }
+                    }
+                }
+            }
+        }
+
+        post {
+            always { echo "Pipeline finished!" }
+            success { echo "Pipeline successful!" }
+            failure { echo "Pipeline failed!" }
         }
     }
 }

@@ -4,6 +4,11 @@ def call(Map config = [:]) {
         agent any
 
         stages {
+            stage('Checkout') {
+    steps {
+        checkout scm
+    }
+}
 
             stage('Detect') {
                 steps {

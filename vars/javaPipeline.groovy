@@ -34,7 +34,7 @@ def call(Map config = [:]) {
                 }
             }
 
-            stage('Deploy') {
+            stage('Deploy aver') {
                 when {
                     expression { config.env == 'prod' }
                 }

@@ -8,7 +8,7 @@ def call(Map config = [:]) {
         docker { image 'node:20' }}
          environment {
            DOCKER_HUB_USER = credentials('dockerhub-creds')
-              DOCKER_HUB_PASS = credentials('dockerhub-pass')
+           
         }
 
         stages {
@@ -54,7 +54,7 @@ def call(Map config = [:]) {
                     }
                 }
             }
-            stage('Build Docker Image') {
+               stage('Build Docker Image') {
                 steps {
                     script {
                         def imageName = "${DOCKER_HUB_USER}/my-app:${env.BUILD_NUMBER}"

@@ -4,7 +4,8 @@ def call(Map config = [:]) {
     def buildCmd  = config.buildCmd
 
     pipeline {
-        agent any
+        agent {
+        docker { image 'node:20' }}
 
         stages {
             stage('Checkout') {

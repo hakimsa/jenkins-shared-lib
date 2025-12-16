@@ -1,41 +1,30 @@
+// vars/ciPipeline.groovy
 def call(Map config = [:]) {
-    pipeline {
-        agent any
+    def buildType = config.buildType ?: 'node'
+    def buildCmd  = config.buildCmd ?: 'npm ci && npm run build'
 
-        stages {
-            stage('Build') {
-                steps {
-                    script {
-                        def buildType = config.buildType ?: 'node'
-                        def buildCmd  = config.buildCmd ?: 'npm ci && npm run build'
-
-                        if (buildType == 'node') {
-                            sh buildCmd
-                        } else if (buildType == 'maven') {
-                            sh buildCmd ?: 'mvn clean package'
-                        } else if (buildType == 'python') {
-                            sh buildCmd ?: 'pip install -r requirements.txt'
-                        } else {
-                            error "Unsupported build type: ${buildType}"
-                        }
-                    }
-                }
+    node {
+        stage('Build') {
+            if (buildType == 'maven') {
+                sh buildCmd ?: 'mvn clean package'
+            } else if (buildType == 'node') {
+                sh buildCmd
+            } else if (buildType == 'python') {
+                sh buildCmd ?: 'pip install -r requirements.txt'
+            } else {
+                error "Unsupported build type: ${buildType}"
             }
+        }
 
-            stage('Test') {
-                steps {
-                    echo "Running tests..."
-                    sh 'npm test || echo "Tests skipped or failed"'
-                }
+        stage('Test') {
+            if (config.runTests != false) {
+                echo "Running tests"
             }
+        }
 
-            stage('Deploy') {
-                when {
-                    expression { config.env == 'prod' }
-                }
-                steps {
-                    echo "Deploying to ${config.env}"
-                }
+        stage('Deploy') {
+            if (config.env == 'prod') {
+                echo "Deploying to ${config.env}"
             }
         }
     }

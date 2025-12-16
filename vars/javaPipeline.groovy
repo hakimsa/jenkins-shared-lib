@@ -2,21 +2,33 @@ def call(Map config = [:]) {
 
     def buildType = config.buildType ?: 'maven'
     def buildCmd  = config.buildCmd  ?: ''
+    def envName   = config.env ?: 'dev'
 
     pipeline {
-        agent any
+        agent {
+            docker {
+                image buildType == 'maven'  ? 'maven:3.9.6-eclipse-temurin-17' :
+                      buildType == 'node'   ? 'node:18' :
+                      buildType == 'python' ? 'python:3.11' :
+                      'alpine:latest'
+            }
+        }
+
         stages {
             stage('Build') {
                 steps {
                     script {
-                        if (buildType == 'maven') {
-                            sh buildCmd ?: 'mvn clean package'
+                        if (buildCmd) {
+                            sh buildCmd
+                        }
+                        else if (buildType == 'maven') {
+                            sh 'mvn clean package'
                         }
                         else if (buildType == 'node') {
-                            sh buildCmd ?: 'npm install && npm run build'
+                            sh 'npm install && npm run build'
                         }
                         else if (buildType == 'python') {
-                            sh buildCmd ?: 'pip install -r requirements.txt'
+                            sh 'pip install -r requirements.txt'
                         }
                         else {
                             error "Build type not supported: ${buildType}"
@@ -34,12 +46,12 @@ def call(Map config = [:]) {
                 }
             }
 
-            stage('Deploy aver') {
+            stage('Deploy') {
                 when {
-                    expression { config.env == 'prod' }
+                    expression { envName == 'prod' }
                 }
                 steps {
-                    echo "Deploying to ${config.env}"
+                    echo "Deploying to ${envName}"
                 }
             }
         }

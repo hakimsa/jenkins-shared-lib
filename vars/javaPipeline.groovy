@@ -1,32 +1,34 @@
 def call(Map config = [:]) {
 
-    def buildType = config.buildType ?: detectBuildType()
-    def buildCmd  = config.buildCmd
-
     pipeline {
         agent any
 
         stages {
+
             stage('Detect') {
                 steps {
-                    echo "Detected build type: ${buildType}"
+                    script {
+                        env.BUILD_TYPE = config.buildType ?: detectBuildType()
+                        env.BUILD_CMD  = config.buildCmd ?: ''
+                        echo "Detected build type: ${env.BUILD_TYPE}"
+                    }
                 }
             }
 
             stage('Build') {
                 steps {
                     script {
-                        if (buildType == 'maven') {
-                            sh buildCmd ?: 'mvn clean package'
+                        if (env.BUILD_TYPE == 'maven') {
+                            sh env.BUILD_CMD ?: 'mvn clean package'
                         }
-                        else if (buildType == 'node') {
-                            sh buildCmd ?: 'npm ci && npm run build'
+                        else if (env.BUILD_TYPE == 'node') {
+                            sh env.BUILD_CMD ?: 'npm ci && npm run build'
                         }
-                        else if (buildType == 'python') {
-                            sh buildCmd ?: 'pip install -r requirements.txt'
+                        else if (env.BUILD_TYPE == 'python') {
+                            sh env.BUILD_CMD ?: 'pip install -r requirements.txt'
                         }
                         else {
-                            error "Unsupported build type: ${buildType}"
+                            error "Unsupported build type: ${env.BUILD_TYPE}"
                         }
                     }
                 }

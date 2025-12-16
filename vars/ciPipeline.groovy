@@ -7,8 +7,8 @@ def call(Map config = [:]) {
         agent {
         docker { image 'node:20' }}
          environment {
-            DOCKER_HUB_USER = credentials('hakimsamouh')
-            DOCKER_HUB_PASS = credentials('HSrd82AB**')
+           DOCKER_HUB_USER = credentials('dockerhub-creds')
+              DOCKER_HUB_PASS = credentials('dockerhub-pass')
         }
 
         stages {

@@ -20,7 +20,7 @@ def call(Map config = [:]) {
                         if (buildType == 'node') {
                             // Usar contenedor Node.js
                             docker.image('node:20').inside {
-                                sh buildCmd ?: 'npm install && npm run build'
+                                sh buildCmd ?: 'npm install && npm start'
                             }
                         } else if (buildType == 'maven') {
                             docker.image('maven:3.9.6-eclipse-temurin-17').inside {

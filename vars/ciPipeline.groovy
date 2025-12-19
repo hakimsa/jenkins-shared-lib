@@ -50,36 +50,35 @@ def call(Map config = [:]) {
                     }
                 }
             }
-         steps {
-        withCredentials([
-            usernamePassword(
-                credentialsId: 'dockerhub-creds',
-                usernameVariable: 'DOCKER_USER',
-                passwordVariable: 'DOCKER_PASS'
-            )
-        ]) {
-            script {
-                def imageName = "hakimsamouh/my-app:${env.BUILD_NUMBER}"
-
-                sh '''
-                  docker build -t app-mgt:${BUILD_NUMBER} .
-                  docker tag app-mgt:${BUILD_NUMBER} ${DOCKER_USER}/app-mgt:${BUILD_NUMBER}
-                  echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                  docker push ${DOCKER_USER}/app-mgt:${BUILD_NUMBER}
-                '''
-
-                env.DOCKER_IMAGE = "${DOCKER_USER}/app-mgt:${env.BUILD_NUMBER}"
+       stage('Docker Build & Push') {
+                steps {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'dockerhub-creds',
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )
+                    ]) {
+                        script {
+                            sh '''
+                              docker build -t app-mgt:${BUILD_NUMBER} .
+                              docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                              echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                              docker push $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                            '''
+                            env.DOCKER_IMAGE = "$DOCKER_USER/app-mgt:${BUILD_NUMBER}"
+                        }
+                    }
+                }
             }
-        }
-    }
-
 
             stage('Deploy') {
                 steps {
                     script {
-                        def containerName = "app-mgt-${env.BUILD_NUMBER}"
-                        sh "docker rm -f ${containerName} || true"
-                        sh "docker run -d --name ${containerName} -p 3000:3000 ${env.DOCKER_IMAGE}"
+                        sh '''
+                          docker rm -f app-mgt || true
+                          docker run -d --name app-mgt -p 3000:3000 $DOCKER_IMAGE
+                        '''
                     }
                 }
             }
@@ -87,9 +86,8 @@ def call(Map config = [:]) {
 
         post {
             always {
-                echo "Pipeline finished!"
+                echo "Pipeline finished"
             }
         }
     }
-
 }

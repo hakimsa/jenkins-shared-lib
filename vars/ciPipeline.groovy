@@ -1,17 +1,13 @@
 def call(Map config = [:]) {
 
-    def buildType = config.buildType ?: detectBuildType()  // node, maven, python
+    def buildType = config.buildType ?: detectBuildType()
     def buildCmd  = config.buildCmd
 
     pipeline {
-        agent {
-        docker { image 'maven:3.9.0' }}
-         environment {
-           DOCKER_HUB_USER = credentials('dockerhub-creds')
-           
-        }
+        agent any
 
         stages {
+
             stage('Checkout') {
                 steps {
                     checkout scm
@@ -24,18 +20,16 @@ def call(Map config = [:]) {
                 }
             }
 
-            stage('Install / Build') {
+            stage('Build') {
                 steps {
                     script {
-                        if (buildType == 'node') {
-                            sh buildCmd ?: 'npm install'
-                            sh 'npm run build:prod || echo "No build step defined"'
-                        } else if (buildType == 'maven') {
+                        if (buildType == 'maven') {
                             sh buildCmd ?: 'mvn clean package'
-                        } else if (buildType == 'python') {
-                            sh buildCmd ?: 'pip install -r requirements.txt'
+                        } else if (buildType == 'node') {
+                            sh 'npm install'
+                            sh 'npm run build:prod || echo "No build step"'
                         } else {
-                            error "Unsupported build type: ${buildType}"
+                            error "Unsupported build type"
                         }
                     }
                 }
@@ -44,24 +38,33 @@ def call(Map config = [:]) {
             stage('Test') {
                 steps {
                     script {
-                        if (buildType == 'node') {
-                            sh 'npm test || echo "No tests found"'
-                        } else if (buildType == 'maven') {
+                        if (buildType == 'maven') {
                             sh 'mvn test'
-                        } else if (buildType == 'python') {
-                            sh 'pytest || echo "No tests found"'
+                        } else if (buildType == 'node') {
+                            sh 'npm test || echo "No tests"'
                         }
                     }
                 }
             }
-               stage('Build Docker Image') {
+
+            stage('Docker Build & Push') {
                 steps {
-                    script {
-                        def imageName = "${DOCKER_HUB_USER}/my-app:${env.BUILD_NUMBER}"
-                        sh "docker build -t ${imageName} ."
-                        sh "echo ${DOCKER_HUB_PASS} | docker login -u ${DOCKER_HUB_USER} --password-stdin"
-                        sh "docker push ${imageName}"
-                        env.DOCKER_IMAGE = imageName
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'dockerhub-creds',
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )
+                    ]) {
+                        script {
+                            sh '''
+                              docker build -t app-mgt:${BUILD_NUMBER} .
+                              docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                              echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                              docker push $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                            '''
+                            env.DOCKER_IMAGE = "$DOCKER_USER/app-mgt:${BUILD_NUMBER}"
+                        }
                     }
                 }
             }
@@ -69,9 +72,10 @@ def call(Map config = [:]) {
             stage('Deploy') {
                 steps {
                     script {
-                        def containerName = "my-app-${env.BUILD_NUMBER}"
-                        sh "docker rm -f ${containerName} || true"
-                        sh "docker run -d --name ${containerName} -p 3000:3000 ${env.DOCKER_IMAGE}"
+                        sh '''
+                          docker rm -f app-mgt || true
+                          docker run -d --name app-mgt -p 3000:3000 $DOCKER_IMAGE
+                        '''
                     }
                 }
             }
@@ -79,11 +83,8 @@ def call(Map config = [:]) {
 
         post {
             always {
-                echo "Pipeline finished!"
+                echo "Pipeline finished"
             }
         }
     }
 }
-        
-
-      

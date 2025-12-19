@@ -5,7 +5,7 @@ def call(Map config = [:]) {
 
     pipeline {
         agent {
-        docker { image 'node:20' }}
+        docker { image 'maven:3.9.0' }}
          environment {
            DOCKER_HUB_USER = credentials('dockerhub-creds')
            

@@ -1,56 +1,104 @@
 def call(Map config = [:]) {
 
-    def buildType = config.buildType ?: detectBuildType()  // node, maven, python
+    def buildType = config.buildType ?: detectBuildType()   // node | maven | python
     def buildCmd  = config.buildCmd
 
     pipeline {
         agent {
-        docker { image 'maven:3.9.0' }}
-      
+            docker {
+                image 'maven:3.9.0'
+            }
+        }
+
         stages {
+
+            stage('Init') {
+                steps {
+                    echo "Shared CI Pipeline started"
+                    echo " Build type: ${buildType}"
+                }
+            }
+
             stage('Checkout') {
                 steps {
                     checkout scm
                 }
             }
 
-            stage('Detect') {
+            /* =======================
+               BUILD STAGES
+            ======================= */
+
+            stage('Build - Node') {
+                when {
+                    expression { buildType == 'node' }
+                }
                 steps {
-                    echo "Detected build type: ${buildType}"
+                    sh buildCmd ?: 'npm install'
+                    sh 'npm run build:prod || echo "No build step defined"'
                 }
             }
 
-            stage('Install / Build') {
+            stage('Build - Maven') {
+                when {
+                    expression { buildType == 'maven' }
+                }
                 steps {
-                    script {
-                        if (buildType == 'node') {
-                            sh buildCmd ?: 'npm install'
-                            sh 'npm run build:prod || echo "No build step defined"'
-                        } else if (buildType == 'maven') {
-                            sh buildCmd ?: 'mvn clean package'
-                        } else if (buildType == 'python') {
-                            sh buildCmd ?: 'pip install -r requirements.txt'
-                        } else {
-                            error "Unsupported build type: ${buildType}"
-                        }
-                    }
+                    sh buildCmd ?: 'mvn clean package'
                 }
             }
 
-            stage('Test') {
+            stage('Build - Python') {
+                when {
+                    expression { buildType == 'python' }
+                }
                 steps {
-                    script {
-                        if (buildType == 'node') {
-                            sh 'npm test || echo "No tests found"'
-                        } else if (buildType == 'maven') {
-                            sh 'mvn test'
-                        } else if (buildType == 'python') {
-                            sh 'pytest || echo "No tests found"'
-                        }
-                    }
+                    sh buildCmd ?: 'pip install -r requirements.txt'
                 }
             }
-       stage('Docker Build & Push') {
+
+            /* =======================
+               TEST STAGES
+            ======================= */
+
+            stage('Test - Node') {
+                when {
+                    expression { buildType == 'node' }
+                }
+                steps {
+                    sh 'npm test || echo "No tests found"'
+                }
+            }
+
+            stage('Test - Maven') {
+                when {
+                    expression { buildType == 'maven' }
+                }
+                steps {
+                    sh 'mvn test'
+                }
+            }
+
+            stage('Test - Python') {
+                when {
+                    expression { buildType == 'python' }
+                }
+                steps {
+                    sh 'pytest || echo "No tests found"'
+                }
+            }
+
+            /* =======================
+               DOCKER
+            ======================= */
+
+            stage('Docker Build & Push') {
+                when {
+                    anyOf {
+                        expression { buildType == 'maven' }
+                        expression { buildType == 'node' }
+                    }
+                }
                 steps {
                     withCredentials([
                         usernamePassword(
@@ -59,34 +107,39 @@ def call(Map config = [:]) {
                             passwordVariable: 'DOCKER_PASS'
                         )
                     ]) {
+                        sh '''
+                          echo "🐳 Building Docker image"
+                          docker build -t app-mgt:${BUILD_NUMBER} .
+                          docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                          echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                          docker push $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                        '''
                         script {
-                            sh '''
-                              docker build -t app-mgt:${BUILD_NUMBER} .
-                              docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
-                              echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                              docker push $DOCKER_USER/app-mgt:${BUILD_NUMBER}
-                            '''
-                            env.DOCKER_IMAGE = "$DOCKER_USER/app-mgt:${BUILD_NUMBER}"
+                            env.DOCKER_IMAGE = "${DOCKER_USER}/app-mgt:${BUILD_NUMBER}"
+                            echo " Image pushed: ${env.DOCKER_IMAGE}"
                         }
                     }
                 }
             }
 
             stage('Deploy') {
+                when {
+                    expression { env.DOCKER_IMAGE != null }
+                }
                 steps {
-                    script {
-                        sh '''
-                          docker rm -f app-mgt || true
-                          docker run -d --name app-mgt -p 3000:3000 $DOCKER_IMAGE
-                        '''
-                    }
+                    sh '''
+                     
+                      echo " Deploying container 🚀🚀🚀"
+                      docker rm -f app-mgt || true
+                      docker run -d --name app-mgt -p 3000:3000 $DOCKER_IMAGE
+                    '''
                 }
             }
         }
 
         post {
             always {
-                echo "Pipeline finished"
+                echo "✅ Pipeline finished"
             }
         }
     }

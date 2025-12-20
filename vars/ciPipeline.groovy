@@ -3,19 +3,22 @@ import org.company.ci.StackConfig
 def call(Map config = [:]) {
     def buildType = config.buildType ?: detectBuildType()
     def buildCmd = config.buildCmd
+    def dockerImage = config.dockerImage // Permite override de imagen
     def stacks = StackConfig.get()
     def stack = stacks[buildType]
     
     if (!stack) {
-        error "Unsupported buildType: ${buildType}"
+        error "Unsupported buildType: ${buildType}. Supported types: ${stacks.keySet()}"
     }
+    
+    // Usa imagen personalizada o la del stack
+    def buildImage = dockerImage ?: stack.image
+    
+    echo "🔍 Using Docker image: ${buildImage}"
 
     pipeline {
         agent {
-            docker {
-                image stack.image
-                args '-v /var/run/docker.sock:/var/run/docker.sock'
-            }
+            label 'docker' // Usa un agente con Docker instalado
         }
 
         stages {
@@ -32,64 +35,51 @@ def call(Map config = [:]) {
                 }
             }
 
-            /* ======================= BUILD STAGES ======================= */
-            stage('Build - Node') {
-                when {
-                    expression { buildType == 'node' }
+            /* ======================= BUILD IN DOCKER ======================= */
+            stage('Build') {
+                agent {
+                    docker {
+                        image buildImage
+                        reuseNode true
+                        args '-v $HOME/.m2:/root/.m2' // Cache Maven/npm
+                    }
                 }
                 steps {
-                    sh buildCmd ?: 'npm install'
-                    sh 'npm run build:prod || echo "No build step defined"'
+                    script {
+                        if (buildType == 'node') {
+                            sh buildCmd ?: 'npm install'
+                            sh 'npm run build:prod || echo "No build step defined"'
+                        } else if (buildType == 'maven') {
+                            sh buildCmd ?: 'mvn clean package'
+                        } else if (buildType == 'python') {
+                            sh buildCmd ?: 'pip install -r requirements.txt'
+                        }
+                    }
                 }
             }
 
-            stage('Build - Maven') {
-                when {
-                    expression { buildType == 'maven' }
+            /* ======================= TEST IN DOCKER ======================= */
+            stage('Test') {
+                agent {
+                    docker {
+                        image buildImage
+                        reuseNode true
+                    }
                 }
                 steps {
-                    sh buildCmd ?: 'mvn clean package'
+                    script {
+                        if (buildType == 'node') {
+                            sh 'npm test || echo "No tests found"'
+                        } else if (buildType == 'maven') {
+                            sh 'mvn test'
+                        } else if (buildType == 'python') {
+                            sh 'pytest || echo "No tests found"'
+                        }
+                    }
                 }
             }
 
-            stage('Build - Python') {
-                when {
-                    expression { buildType == 'python' }
-                }
-                steps {
-                    sh buildCmd ?: 'pip install -r requirements.txt'
-                }
-            }
-
-            /* ======================= TEST STAGES ======================= */
-            stage('Test - Node') {
-                when {
-                    expression { buildType == 'node' }
-                }
-                steps {
-                    sh 'npm test || echo "No tests found"'
-                }
-            }
-
-            stage('Test - Maven') {
-                when {
-                    expression { buildType == 'maven' }
-                }
-                steps {
-                    sh 'mvn test'
-                }
-            }
-
-            stage('Test - Python') {
-                when {
-                    expression { buildType == 'python' }
-                }
-                steps {
-                    sh 'pytest || echo "No tests found"'
-                }
-            }
-
-            /* ======================= DOCKER ======================= */
+            /* ======================= DOCKER BUILD & PUSH ======================= */
             stage('Docker Build & Push') {
                 when {
                     anyOf {
@@ -98,21 +88,21 @@ def call(Map config = [:]) {
                     }
                 }
                 steps {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: 'dockerhub-creds',
-                            usernameVariable: 'DOCKER_USER',
-                            passwordVariable: 'DOCKER_PASS'
-                        )
-                    ]) {
-                        sh '''
-                            echo "🐳 Building Docker image"
-                            docker build -t app-mgt:${BUILD_NUMBER} .
-                            docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
-                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                            docker push $DOCKER_USER/app-mgt:${BUILD_NUMBER}
-                        '''
-                        script {
+                    script {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'dockerhub-creds',
+                                usernameVariable: 'DOCKER_USER',
+                                passwordVariable: 'DOCKER_PASS'
+                            )
+                        ]) {
+                            sh '''
+                                echo "🐳 Building Docker image"
+                                docker build -t app-mgt:${BUILD_NUMBER} .
+                                docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                                docker push $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                            '''
                             env.DOCKER_IMAGE = "${DOCKER_USER}/app-mgt:${BUILD_NUMBER}"
                             echo "✅ Image pushed: ${env.DOCKER_IMAGE}"
                         }

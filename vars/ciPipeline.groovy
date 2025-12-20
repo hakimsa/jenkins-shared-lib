@@ -144,3 +144,14 @@ def call(Map config = [:]) {
         }
     }
 }
+def detectBuildType() {
+    if (fileExists('pom.xml')) {
+        return 'maven'
+    } else if (fileExists('package.json')) {
+        return 'node'
+    } else if (fileExists('requirements.txt') || fileExists('setup.py')) {
+        return 'python'
+    } else {
+        error "Unable to detect build type. Please specify 'buildType' in the config."
+    }
+}

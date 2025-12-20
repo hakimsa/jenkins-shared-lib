@@ -1,21 +1,28 @@
-def call(Map config = [:]) {
+import org.company.ci.StackConfig
 
-    def buildType = config.buildType ?: detectBuildType()   // node | maven | python
-    def buildCmd  = config.buildCmd
+def call(Map config = [:]) {
+    def buildType = config.buildType ?: detectBuildType()
+    def buildCmd = config.buildCmd
+    def stacks = StackConfig.get()
+    def stack = stacks[buildType]
+    
+    if (!stack) {
+        error "Unsupported buildType: ${buildType}"
+    }
 
     pipeline {
         agent {
             docker {
-                image 'maven:3.9.0'
+                image stack.image
+                args '-v /var/run/docker.sock:/var/run/docker.sock'
             }
         }
 
         stages {
-
             stage('Init') {
                 steps {
-                    echo "Shared CI Pipeline started"
-                    echo " Build type: ${buildType}"
+                    echo "🚀 Shared CI Pipeline started"
+                    echo "📦 Build type: ${buildType}"
                 }
             }
 
@@ -25,10 +32,7 @@ def call(Map config = [:]) {
                 }
             }
 
-            /* =======================
-               BUILD STAGES
-            ======================= */
-
+            /* ======================= BUILD STAGES ======================= */
             stage('Build - Node') {
                 when {
                     expression { buildType == 'node' }
@@ -57,10 +61,7 @@ def call(Map config = [:]) {
                 }
             }
 
-            /* =======================
-               TEST STAGES
-            ======================= */
-
+            /* ======================= TEST STAGES ======================= */
             stage('Test - Node') {
                 when {
                     expression { buildType == 'node' }
@@ -88,10 +89,7 @@ def call(Map config = [:]) {
                 }
             }
 
-            /* =======================
-               DOCKER
-            ======================= */
-
+            /* ======================= DOCKER ======================= */
             stage('Docker Build & Push') {
                 when {
                     anyOf {
@@ -108,15 +106,15 @@ def call(Map config = [:]) {
                         )
                     ]) {
                         sh '''
-                          echo "🐳 Building Docker image"
-                          docker build -t app-mgt:${BUILD_NUMBER} .
-                          docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
-                          echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                          docker push $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                            echo "🐳 Building Docker image"
+                            docker build -t app-mgt:${BUILD_NUMBER} .
+                            docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                            docker push $DOCKER_USER/app-mgt:${BUILD_NUMBER}
                         '''
                         script {
                             env.DOCKER_IMAGE = "${DOCKER_USER}/app-mgt:${BUILD_NUMBER}"
-                            echo " Image pushed: ${env.DOCKER_IMAGE}"
+                            echo "✅ Image pushed: ${env.DOCKER_IMAGE}"
                         }
                     }
                 }
@@ -128,10 +126,9 @@ def call(Map config = [:]) {
                 }
                 steps {
                     sh '''
-                     
-                      echo " Deploying container 🚀🚀🚀"
-                      docker rm -f app-mgt || true
-                      docker run -d --name app-mgt -p 3000:3000 $DOCKER_IMAGE
+                        echo "🚀 Deploying container..."
+                        docker rm -f app-mgt || true
+                        docker run -d --name app-mgt -p 3000:3000 $DOCKER_IMAGE
                     '''
                 }
             }
@@ -144,6 +141,7 @@ def call(Map config = [:]) {
         }
     }
 }
+
 def detectBuildType() {
     if (fileExists('pom.xml')) {
         return 'maven'

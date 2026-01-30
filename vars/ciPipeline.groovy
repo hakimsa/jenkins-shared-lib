@@ -21,8 +21,8 @@ def call(Map config = [:]) {
         stages {
             stage('Init') {
                 steps {
-                    echo "🚀 Shared CI Pipeline started"
-                    echo "📦 Build type: ${buildType}"
+                    echo "Shared CI Pipeline started"
+                    echo "Build type: ${buildType}"
                 }
             }
 
@@ -106,7 +106,7 @@ def call(Map config = [:]) {
                         )
                     ]) {
                         sh '''
-                            echo "🐳 Building Docker image"
+                            echo " Building Docker image"
                             docker build -t app-mgt:${BUILD_NUMBER} .
                             docker tag app-mgt:${BUILD_NUMBER} $DOCKER_USER/app-mgt:${BUILD_NUMBER}
                             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
@@ -114,7 +114,7 @@ def call(Map config = [:]) {
                         '''
                         script {
                             env.DOCKER_IMAGE = "${DOCKER_USER}/app-mgt:${BUILD_NUMBER}"
-                            echo "✅ Image pushed: ${env.DOCKER_IMAGE}"
+                            echo "Image pushed: ${env.DOCKER_IMAGE}"
                         }
                     }
                 }
@@ -126,7 +126,7 @@ def call(Map config = [:]) {
                 }
                 steps {
                     sh '''
-                        echo "🚀 Deploying container..."
+                        echo " Deploying container..."
                         docker rm -f app-mgt || true
                         docker run -d --name app-mgt -p 3000:3000 $DOCKER_IMAGE
                     '''
@@ -136,7 +136,7 @@ def call(Map config = [:]) {
 
         post {
             always {
-                echo "✅ Pipeline finished"
+                echo " Pipeline finished"
             }
         }
     }

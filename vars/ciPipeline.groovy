@@ -25,6 +25,12 @@ def call(Map config = [:]) {
                     echo "Build type: ${buildType}"
                 }
             }
+             stage('Checkout') {
+            steps {
+                git credentialsId: 'github-credentials-id', 
+                    url: 'https://github.com/hakimsa/api_nodejs_PRC.git'
+            }
+        }
 
             stage('Checkout') {
                 steps {

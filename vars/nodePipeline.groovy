@@ -1,5 +1,9 @@
 def call(Map config = [:]) {
 
+    // Valores con fallback en Groovy
+    def appName = config.appName ?: 'node-app'
+    def nodeEnv = config.nodeEnv ?: 'production'
+
     pipeline {
         agent any
 
@@ -8,12 +12,11 @@ def call(Map config = [:]) {
         }
 
         environment {
-            APP_NAME = config.appName ?: 'node-app'
-            NODE_ENV = config.nodeEnv ?: 'production'
+            APP_NAME = "${appName}"
+            NODE_ENV = "${nodeEnv}"
         }
 
         stages {
-
             stage('Install') {
                 steps {
                     sh '''
@@ -47,11 +50,11 @@ def call(Map config = [:]) {
 
             stage('Package') {
                 steps {
-                    sh '''
+                    sh """
                         mkdir -p package
 
                         cp package.json package/
-                        [ -f package-lock.json ] && cp package-lock.json package-lock.json
+                        [ -f package-lock.json ] && cp package-lock.json package/
 
                         [ -d dist ] && cp -r dist package/
                         [ -d build ] && cp -r build package/
@@ -60,10 +63,11 @@ def call(Map config = [:]) {
 
                         cp -r node_modules package/
 
-                        tar -czf ${APP_NAME}.tar.gz package
-                    '''
+                        tar -czf ${appName}.tar.gz package
+                    """
                 }
             }
+
         }
 
         post {

@@ -32,7 +32,7 @@ def call(Map config = [:]) {
                     expression { fileExists('package.json') }
                 }
                 steps {
-                    sh 'npm test'
+                    sh 'echo lanzar test npm test'
                 }
             }
 

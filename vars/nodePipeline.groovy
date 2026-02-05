@@ -1,11 +1,18 @@
 def call(Map config = [:]) {
+
     pipeline {
         agent any
 
         tools {
             nodejs 'node-18'
         }
- stages {
+
+        environment {
+            APP_NAME = config.appName ?: 'node-app'
+            NODE_ENV = config.nodeEnv ?: 'production'
+        }
+
+        stages {
 
             stage('Install') {
                 steps {
@@ -28,14 +35,13 @@ def call(Map config = [:]) {
 
             stage('Build') {
                 when {
-                    anyOf {
-                        fileExists('dist')
-                        fileExists('build')
-                        expression { sh(script: "jq -e '.scripts.build' package.json > /dev/null", returnStatus: true) == 0 }
+                    expression {
+                        def pkg = readJSON file: 'package.json'
+                        return pkg?.scripts?.build != null
                     }
                 }
                 steps {
-                    sh 'npm run build || echo "No build step"'
+                    sh 'npm run build'
                 }
             }
 
@@ -45,7 +51,7 @@ def call(Map config = [:]) {
                         mkdir -p package
 
                         cp package.json package/
-                        [ -f package-lock.json ] && cp package-lock.json package/
+                        [ -f package-lock.json ] && cp package-lock.json package-lock.json
 
                         [ -d dist ] && cp -r dist package/
                         [ -d build ] && cp -r build package/
@@ -58,7 +64,6 @@ def call(Map config = [:]) {
                     '''
                 }
             }
-
         }
 
         post {

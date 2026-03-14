@@ -5,7 +5,7 @@ def call(Map config = [:]) {
     def nodeEnv = config.nodeEnv ?: 'production'
 
     pipeline {
-        agent any
+        agent  { label 'jenkins_sandbox_agent' }
 
         tools {
             nodejs 'node-18'

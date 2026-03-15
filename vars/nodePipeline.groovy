@@ -33,7 +33,7 @@ def call(Map config = [:]) {
                 }
                 steps {
                     sh 'echo lanzar test npm test'
-                    sh 'echo ${nodeEnv}'
+                    sh "echo $NODE_ENV"
                 }
             }
 

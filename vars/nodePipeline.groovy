@@ -34,7 +34,7 @@ def call(Map config = [:]) {
                 steps {
                     sh 'echo lanzar test npm test'
                     sh "echo $NODE_ENV"
-                    sh  'echo APP_NAME: $APP_NAME"'
+                    sh "echo $APP_NAME"
                 }
             }
 

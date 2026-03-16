@@ -1,84 +1,65 @@
-
 def call(Map config = [:]) {
 
-    // Valores por defecto con fallback
-    def appName = config.appName ?: 'java-app'
-    def javaVersion = config.javaVersion ?: 'jdk-17'
-    //def buildTool = config.buildTool ?: 'maven'
+    // Valores con fallback
+    def appName = config.appName ?: 'springboot-app'
+    def javaEnv = config.javaEnv ?: 'development'
+    def jdkVersion = config.javaVersion ?: 'jdk-11'
+    def mavenVersion = config.mavenVersion ?: 'maven-3.9'
 
     pipeline {
-        agent { label 'jenkins_sandbox_agent' }
+        agent any
 
         tools {
-            jdk "${javaVersion}"
-            maven 'maven-3.9'
+            jdk jdkVersion
+            maven mavenVersion
         }
 
         environment {
             APP_NAME = "${appName}"
-            JAVA_HOME = tool "${javaVersion}"
+            JAVA_ENV = "${javaEnv}"
         }
 
         stages {
-
             stage('Checkout') {
                 steps {
+                    echo "Checkout code for ${APP_NAME}"
                     checkout scm
                 }
             }
 
             stage('Build') {
                 steps {
-                    sh '''
-                        java -version
-                        mvn -version
-                        mvn -B clean compile
-                    '''
+                    echo "Building ${APP_NAME} with Maven"
+                    sh "mvn clean package -DskipTests"
                 }
             }
 
             stage('Test') {
                 steps {
-                    sh '''
-                        echo "Running tests..."
-                        
-                        echo $APP_NAME
-                    '''
+                    echo "Running tests in ${JAVA_ENV}"
+                    sh "mvn test"
                 }
             }
 
             stage('Package') {
                 steps {
-                    sh '''
-                        mvn -B package -DskipTests
-                    '''
-                }
-            }
-
-            stage('Prepare Artifact') {
-                steps {
+                    echo "Packaging ${APP_NAME}"
                     sh """
                         mkdir -p package
-
                         cp target/*.jar package/
-
-                        [ -f Dockerfile ] && cp Dockerfile package/
-                        [ -f application.yml ] && cp application.yml package/
-                        [ -f application.properties ] && cp application.properties package/
-
-                        tar -czf ${appName}.tar.gz package
+                        tar -czf ${APP_NAME}.tar.gz package
                     """
                 }
             }
-
         }
 
         post {
             success {
+                echo "Pipeline finished successfully!"
                 archiveArtifacts artifacts: '*.tar.gz', fingerprint: true
             }
             failure {
-                echo "Build failed"
+                echo "Pipeline failed!"
             }
         }
     }

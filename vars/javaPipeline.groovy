@@ -41,6 +41,8 @@ def call(Map config = [:]) {
                         sh '''
                         export SPRING_DATASOURCE_USERNAME=$DB_USER
                         export SPRING_DATASOURCE_PASSWORD=$DB_PASS
+                        export DB_HOST="jdbc:postgresql://172.20.0.2:5432"
+                        export DB_NAME="db_hakim"
                         mvn clean package -DskipTests
                         '''
                     }

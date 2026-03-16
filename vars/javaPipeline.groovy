@@ -7,7 +7,7 @@ def call(Map config = [:]) {
     def mavenVersion = config.mavenVersion ?: 'maven-3.9'
 
     pipeline {
-        agent any
+        agent { label 'jenkins_sandbox_agent' }
 
         tools {
             jdk jdkVersion

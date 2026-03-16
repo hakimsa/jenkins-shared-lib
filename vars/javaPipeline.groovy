@@ -30,26 +30,27 @@ def call(Map config = [:]) {
             }
 
             stage('Build') {
-                steps {
-                    echo "Building ${APP_NAME} with Maven"
+    steps {
+        echo "Building ${APP_NAME} with Maven"
 
-                    withCredentials([usernamePassword(
-                        credentialsId: 'postgres-db',
-                        usernameVariable: 'DB_USER',
-                        passwordVariable: 'DB_PASS'
-                    )]) {
+        withCredentials([usernamePassword(
+            credentialsId: 'postgres-db',
+            usernameVariable: 'DB_USER',
+            passwordVariable: 'DB_PASS'
+        )]) {
 
-                      env.SPRING_DATASOURCE_USERNAME = env.DB_USER
-                      env.SPRING_DATASOURCE_PASSWORD = env.DB_PASS
-
-            sh """
-            mvn clean package -DskipTests=false \
-        
-            """
-                    }
-                }
+            // Crear un bloque withEnv para pasar variables a Maven
+            withEnv([
+                "SPRING_DATASOURCE_USERNAME=${env.DB_USER}",
+                "SPRING_DATASOURCE_PASSWORD=${env.DB_PASS}"
+            ]) {
+                sh """
+                mvn clean package -DskipTests=false
+                """
             }
-
+        }
+    }
+}
             stage('Test') {
                 steps {
                     echo "Running tests in ${JAVA_ENV}"

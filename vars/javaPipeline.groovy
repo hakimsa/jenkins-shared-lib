@@ -41,9 +41,9 @@ def call(Map config = [:]) {
                       
             sh """
             mvn clean package -DskipTests \
-            export SPRING_DATASOURCE_URL=jdbc:postgresql://172.20.0.2:5432/db_hakim
-    export SPRING_DATASOURCE_USERNAME=$DB_USER
-    export SPRING_DATASOURCE_PASSWORD=$DB_PASS
+           -Dspring.datasource.url=jdbc:postgresql://172.20.0.2:5432/db_hakim \
+      -Dspring.datasource.username=$DB_USER \
+      -Dspring.datasource.password=$DB_PASS
             """
                     }
                 }

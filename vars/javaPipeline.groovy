@@ -17,6 +17,7 @@ def call(Map config = [:]) {
         environment {
             APP_NAME = "${appName}"
             JAVA_ENV = "${javaEnv}"
+            SPRING_DATASOURCE_URL = "jdbc:postgresql://172.20.0.2:5432/db_hakim"
         }
 
         stages {
@@ -38,14 +39,12 @@ def call(Map config = [:]) {
                         passwordVariable: 'DB_PASS'
                     )]) {
 
-                      
+                      env.SPRING_DATASOURCE_USERNAME = env.DB_USER
+                      env.SPRING_DATASOURCE_PASSWORD = env.DB_PASS
+
             sh """
             mvn clean package -DskipTests=false \
-           -Dspring.datasource.url=jdbc:postgresql://172.20.0.2:5432/db_hakim \
-           -Dspring.datasource.username=$DB_USER \
-           -Dspring.datasource.password=$DB_PASS\
-           -Dsurefire.env.DB_USER=$DB_USER \
-           -Dsurefire.env.DB_PASS=$DB_PASS
+        
             """
                     }
                 }

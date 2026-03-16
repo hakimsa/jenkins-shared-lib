@@ -16,7 +16,7 @@ def call(Map config = [:]) {
         environment {
             APP_NAME = "${appName}"
             JAVA_ENV = "${javaEnv}"
-            SPRING_DATASOURCE_URL = "jdbc:postgresql://postgress-database-1:5432/db_hakim"
+            SPRING_DATASOURCE_URL = "jdbc:postgresql://172.22.0.2:5432/db_hakim"
         }
 
         stages {

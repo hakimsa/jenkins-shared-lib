@@ -1,6 +1,5 @@
 def call(Map config = [:]) {
 
-    // Valores con fallback
     def appName = config.appName ?: 'springboot-app'
     def javaEnv = config.javaEnv ?: 'development'
     def jdkVersion = config.javaVersion ?: 'jdk-11'
@@ -17,7 +16,7 @@ def call(Map config = [:]) {
         environment {
             APP_NAME = "${appName}"
             JAVA_ENV = "${javaEnv}"
-            SPRING_DATASOURCE_URL = "jdbc:postgresql://172.20.0.2:5432/db_hakim"
+            SPRING_DATASOURCE_URL = "jdbc:postgresql://postgres:5432/db_hakim"
         }
 
         stages {
@@ -29,38 +28,39 @@ def call(Map config = [:]) {
                 }
             }
 
-            stage('Build') {
-    steps {
-        echo "Building ${APP_NAME} with Maven"
-
-        withCredentials([usernamePassword(
-            credentialsId: 'postgres-db',
-            usernameVariable: 'DB_USER',
-            passwordVariable: 'DB_PASS'
-        )]) {
-
-            // Crear un bloque withEnv para pasar variables a Maven
-            withEnv([
-                "SPRING_DATASOURCE_USERNAME=${env.DB_USER}",
-                "SPRING_DATASOURCE_PASSWORD=${env.DB_PASS}"
-            ]) {
-                sh """
-                mvn clean package -DskipTests=false
-                """
+            stage('Compile') {
+                steps {
+                    sh "mvn clean compile"
+                }
             }
-        }
-    }
-}
+
             stage('Test') {
                 steps {
-                    echo "Running tests in ${JAVA_ENV}"
-                    sh "mvn test"
+                    withCredentials([usernamePassword(
+                        credentialsId: 'postgres-db',
+                        usernameVariable: 'DB_USER',
+                        passwordVariable: 'DB_PASS'
+                    )]) {
+
+                        withEnv([
+                            "SPRING_DATASOURCE_USERNAME=${DB_USER}",
+                            "SPRING_DATASOURCE_PASSWORD=${DB_PASS}"
+                        ]) {
+
+                            sh "mvn test"
+                        }
+                    }
                 }
             }
 
             stage('Package') {
                 steps {
-                    echo "Packaging ${APP_NAME}"
+                    sh "mvn package -DskipTests"
+                }
+            }
+
+            stage('Archive') {
+                steps {
                     sh """
                         mkdir -p package
                         cp target/*.jar package/
@@ -72,8 +72,8 @@ def call(Map config = [:]) {
 
         post {
             success {
-                echo "Pipeline finished successfully!"
                 archiveArtifacts artifacts: '*.tar.gz', fingerprint: true
+                echo "Pipeline finished successfully!"
             }
             failure {
                 echo "Pipeline failed!"

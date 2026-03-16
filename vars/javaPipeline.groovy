@@ -42,8 +42,10 @@ def call(Map config = [:]) {
             sh """
             mvn clean package -DskipTests=false \
            -Dspring.datasource.url=jdbc:postgresql://172.20.0.2:5432/db_hakim \
-      -Dspring.datasource.username=$DB_USER \
-      -Dspring.datasource.password=$DB_PASS
+           -Dspring.datasource.username=$DB_USER \
+           -Dspring.datasource.password=$DB_PASS\
+           -Dsurefire.env.DB_USER=$DB_USER \
+           -Dsurefire.env.DB_PASS=$DB_PASS
             """
                     }
                 }

@@ -20,6 +20,7 @@ def call(Map config = [:]) {
         }
 
         stages {
+
             stage('Checkout') {
                 steps {
                     echo "Checkout code for ${APP_NAME}"
@@ -30,7 +31,19 @@ def call(Map config = [:]) {
             stage('Build') {
                 steps {
                     echo "Building ${APP_NAME} with Maven"
-                    sh "mvn clean package -DskipTests"
+
+                    withCredentials([usernamePassword(
+                        credentialsId: 'postgres-db',
+                        usernameVariable: 'DB_USER',
+                        passwordVariable: 'DB_PASS'
+                    )]) {
+
+                        sh '''
+                        export SPRING_DATASOURCE_USERNAME=$DB_USER
+                        export SPRING_DATASOURCE_PASSWORD=$DB_PASS
+                        mvn clean package -DskipTests
+                        '''
+                    }
                 }
             }
 
